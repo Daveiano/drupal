@@ -363,6 +363,32 @@ class EntityViewsData implements EntityHandlerInterface, EntityViewsDataInterfac
           ];
         }
       }
+
+      // Declare computed base fields.
+      // @todo Also declare computed bundle fields. See
+      //   https://www.drupal.org/project/drupal/issues/3404369.
+      if ($field_definition->isComputed() && !$field_definition->isInternal()) {
+        $views_field = [];
+        $views_field['title'] = $field_definition->getLabel();
+
+        if ($description = $field_definition->getDescription()) {
+          $views_field['help'] = $description;
+        }
+
+        // Computed fields have no database storage, so can't participate in
+        // a query. Therefore, there is no sort, argument, or filter.
+        $views_field['field']['id'] = 'field';
+        $views_field['entity field'] = $field_definition->getName();
+
+        // Special handling for field type.
+        // @todo Remove this hardcoding in
+        //   https://www.drupal.org/project/drupal/issues/2337515.
+        if ($field_definition->getType() == 'uri') {
+          $views_field['field']['default_formatter'] = 'string';
+        }
+
+        $data[$table_mapping->getBaseTable()][$field_definition->getName()] = $views_field;
+      }
     }
     if (($uid_key = $entity_keys['uid'] ?? '')) {
       $data[$data_table][$uid_key]['filter']['id'] = 'user_name';
@@ -426,7 +452,7 @@ class EntityViewsData implements EntityHandlerInterface, EntityViewsDataInterfac
    * @param string $field_name
    *   The name of the field to handle.
    * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
-   *   The field definition defined in Entity::baseFieldDefinitions()
+   *   The field definition.
    * @param \Drupal\Core\Entity\Sql\TableMappingInterface $table_mapping
    *   The table mapping information
    * @param array $table_data
@@ -509,7 +535,7 @@ class EntityViewsData implements EntityHandlerInterface, EntityViewsDataInterfac
         break;
 
       case 'language':
-        $views_field['field']['id'] = 'field';
+        $views_field['field']['id'] = 'field_language';
         $views_field['argument']['id'] = 'language';
         $views_field['filter']['id'] = 'language';
         $views_field['sort']['id'] = 'standard';
@@ -644,7 +670,10 @@ class EntityViewsData implements EntityHandlerInterface, EntityViewsDataInterfac
           'id' => 'standard',
         ];
         $views_field['field']['id'] = 'field';
-        $views_field['argument']['id'] = 'numeric';
+        // Provide an argument plugin that has a meaningful titleQuery()
+        // implementation getting the entity label.
+        $views_field['argument']['id'] = 'entity_target_id';
+        $views_field['argument']['target_entity_type_id'] = $entity_type_id;
         $views_field['filter']['id'] = 'numeric';
         $views_field['sort']['id'] = 'standard';
       }
